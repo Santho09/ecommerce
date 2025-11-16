@@ -214,6 +214,17 @@ Potential improvements for this project:
 - Check browser console for fetch errors
 - Verify the file path is correct
 
+## 🚀 Deployment
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+
+Quick deployment options:
+- **Easiest**: Vercel (Frontend) + Railway (Backend)
+- **Alternative**: Netlify (Frontend) + Render (Backend)
+- **Full Control**: VPS with Nginx + PM2
+
+The backend has been configured to use environment variables for production. See [backend/ENV_SETUP.md](./backend/ENV_SETUP.md) for environment variable configuration.
+
 ## 📄 License
 
 This project is open source and available for educational purposes.

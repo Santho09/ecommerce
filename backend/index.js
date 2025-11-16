@@ -6,12 +6,18 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const JWT_SECRET = 'your-secret-key-change-in-production'; // In production, use environment variable
+const PORT = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || '6747933461adbf52fe7187b45a781e14543d2269192d79e55251604d172f2da8'; // In production, use environment variable
 const USERS_FILE = path.join(__dirname, 'users.json');
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://ecommerce-murex-three-67.vercel.app/';
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: process.env.NODE_ENV === 'production' 
+        ? FRONTEND_URL 
+        : '*', // Allow all origins in development
+    credentials: true
+}));
 app.use(express.json());
 
 // Initialize users file if it doesn't exist
@@ -164,7 +170,11 @@ app.get('/health', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-    console.log(`🚀 Server is running on http://localhost:${PORT}`);
+    console.log(`🚀 Server is running on port ${PORT}`);
     console.log(`📝 Users file: ${USERS_FILE}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    if (process.env.NODE_ENV === 'production') {
+        console.log(`🔒 CORS enabled for: ${FRONTEND_URL}`);
+    }
 });
 
