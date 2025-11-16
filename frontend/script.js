@@ -5,7 +5,7 @@ let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 let cart = JSON.parse(sessionStorage.getItem('cart')) || []; // Cart array: [{id, quantity, product}]
 let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
 let purchaseHistory = JSON.parse(localStorage.getItem('purchaseHistory')) || [];
-const API_BASE_URL = 'http://localhost:3000';
+const API_BASE_URL = 'https://ecommerce-jknx.onrender.com';
 
 // Fallback product data (used when data.json can't be loaded)
 const FALLBACK_DATA = {
