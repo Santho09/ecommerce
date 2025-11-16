@@ -9,7 +9,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || '6747933461adbf52fe7187b45a781e14543d2269192d79e55251604d172f2da8'; // In production, use environment variable
 const USERS_FILE = path.join(__dirname, 'users.json');
-const FRONTEND_URL = process.env.FRONTEND_URL || 'https://ecommerce-murex-three-67.vercel.app/';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://ecommerce-murex-three-67.vercel.app';
 
 // Middleware
 app.use(cors({
