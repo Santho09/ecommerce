@@ -1,7 +1,7 @@
 // ===== Global Variables =====
 let products = [];
 let filteredProducts = [];
-let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+let favorites = [];
 let cart = JSON.parse(sessionStorage.getItem('cart')) || []; // Cart array: [{id, quantity, product}]
 let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
 let purchaseHistory = [];
@@ -139,11 +139,16 @@ function migrateLegacyData(base) {
     const legacyData = JSON.parse(localStorage.getItem(base));
     if (legacyData && legacyData.length) {
         const scopedKey = getUserStorageKey(base);
-        const migrated = legacyData.map(entry => ({
-            ...entry,
-            ownerEmail: entry.ownerEmail || currentUser.email
-        }));
-        localStorage.setItem(scopedKey, JSON.stringify(migrated));
+        if (Array.isArray(legacyData) && typeof legacyData[0] === 'object') {
+            const migrated = legacyData.map(entry => ({
+                ...entry,
+                ownerEmail: entry.ownerEmail || currentUser.email
+            }));
+            localStorage.setItem(scopedKey, JSON.stringify(migrated));
+        } else {
+            // Primitive array like favorites
+            localStorage.setItem(scopedKey, JSON.stringify(legacyData));
+        }
         localStorage.removeItem(base);
     }
 }
@@ -151,6 +156,7 @@ function migrateLegacyData(base) {
 function loadUserScopedData() {
     migrateLegacyData('purchaseHistory');
     migrateLegacyData('orders');
+    migrateLegacyData('favorites');
 
     const historyKey = getUserStorageKey('purchaseHistory');
     const rawHistory = JSON.parse(localStorage.getItem(historyKey)) || [];
@@ -163,12 +169,16 @@ function loadUserScopedData() {
     orders = currentUser?.email
         ? rawOrders.filter(order => order.ownerEmail === currentUser.email)
         : [];
+
+    const favoritesKey = getUserStorageKey('favorites');
+    favorites = JSON.parse(localStorage.getItem(favoritesKey)) || [];
 }
 
 function persistUserScopedData() {
     if (!currentUser || !currentUser.email) return;
     localStorage.setItem(getUserStorageKey('purchaseHistory'), JSON.stringify(purchaseHistory));
     localStorage.setItem(getUserStorageKey('orders'), JSON.stringify(orders));
+    localStorage.setItem(getUserStorageKey('favorites'), JSON.stringify(favorites));
 }
 
 // ===== Initialize App =====
@@ -414,7 +424,7 @@ function toggleFavorite(productId) {
     } else {
         favorites.push(productId);
     }
-    localStorage.setItem('favorites', JSON.stringify(favorites));
+    persistUserScopedData();
     updateFavoritesCount();
     renderProducts();
     renderFavorites();
