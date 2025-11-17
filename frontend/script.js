@@ -4,8 +4,8 @@ let filteredProducts = [];
 let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 let cart = JSON.parse(sessionStorage.getItem('cart')) || []; // Cart array: [{id, quantity, product}]
 let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
-let purchaseHistory = JSON.parse(localStorage.getItem('purchaseHistory')) || [];
-let orders = JSON.parse(localStorage.getItem('orders')) || [];
+let purchaseHistory = [];
+let orders = [];
 const API_BASE_URL = 'https://ecommerce-jknx.onrender.com';
 
 // Fallback product data (used when data.json can't be loaded)
@@ -129,6 +129,25 @@ const FALLBACK_DATA = {
   ]
 };
 
+function getUserStorageKey(base) {
+    if (!currentUser || !currentUser.email) return base;
+    return `${base}_${currentUser.email}`;
+}
+
+function loadUserScopedData() {
+    const historyKey = getUserStorageKey('purchaseHistory');
+    purchaseHistory = JSON.parse(localStorage.getItem(historyKey)) || [];
+    
+    const ordersKey = getUserStorageKey('orders');
+    orders = JSON.parse(localStorage.getItem(ordersKey)) || [];
+}
+
+function persistUserScopedData() {
+    if (!currentUser || !currentUser.email) return;
+    localStorage.setItem(getUserStorageKey('purchaseHistory'), JSON.stringify(purchaseHistory));
+    localStorage.setItem(getUserStorageKey('orders'), JSON.stringify(orders));
+}
+
 // ===== Initialize App =====
 document.addEventListener('DOMContentLoaded', () => {
     // Check for a special flag that indicates user just logged in
@@ -150,6 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionUser = sessionStorage.getItem('currentUser');
     if (sessionUser) {
         currentUser = JSON.parse(sessionUser);
+        loadUserScopedData();
         initializeTheme();
         setupEventListeners();
         checkAuthStatus();
@@ -640,7 +660,7 @@ function handleCheckoutSubmit(e) {
     };
     
     orders.push(order);
-    localStorage.setItem('orders', JSON.stringify(orders));
+    persistUserScopedData();
     
     order.items.forEach(item => {
         for (let i = 0; i < item.quantity; i++) {
@@ -655,7 +675,7 @@ function handleCheckoutSubmit(e) {
             });
         }
     });
-    localStorage.setItem('purchaseHistory', JSON.stringify(purchaseHistory));
+    persistUserScopedData();
     
     cart = [];
     sessionStorage.setItem('cart', JSON.stringify(cart));
@@ -680,6 +700,10 @@ function logout() {
     currentUser = null;
     sessionStorage.removeItem('currentUser');
     sessionStorage.removeItem('token');
+    sessionStorage.removeItem('cart');
+    cart = [];
+    purchaseHistory = [];
+    orders = [];
     
     // Redirect to login page
     window.location.href = 'login.html';
