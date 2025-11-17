@@ -4,8 +4,7 @@ let filteredProducts = [];
 let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
 let cart = JSON.parse(sessionStorage.getItem('cart')) || []; // Cart array: [{id, quantity, product}]
 let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
-let purchaseHistory = [];
-let analyticsOverview = null;
+let purchaseHistory = JSON.parse(localStorage.getItem('purchaseHistory')) || [];
 const API_BASE_URL = 'https://ecommerce-jknx.onrender.com';
 
 // Fallback product data (used when data.json can't be loaded)
@@ -317,13 +316,8 @@ function setupEventListeners() {
     document.getElementById('cart-btn').addEventListener('click', toggleCartSidebar);
     document.getElementById('close-cart').addEventListener('click', toggleCartSidebar);
     
-    // Checkout modal
-    document.getElementById('purchase-btn').addEventListener('click', openCheckoutModal);
-    document.getElementById('close-checkout').addEventListener('click', closeCheckoutModal);
-    document.getElementById('checkout-modal').addEventListener('click', (e) => {
-        if (e.target.id === 'checkout-modal') closeCheckoutModal();
-    });
-    document.getElementById('checkout-form').addEventListener('submit', handleCheckoutSubmit);
+    // Purchase button
+    document.getElementById('purchase-btn').addEventListener('click', handlePurchase);
 }
 
 function applyFilters() {
@@ -558,90 +552,40 @@ function renderCart() {
     if (cartTotal) cartTotal.textContent = total.toFixed(2);
 }
 
-function openCheckoutModal() {
+function handlePurchase() {
     if (cart.length === 0) {
         alert('Your cart is empty!');
         return;
     }
-    document.getElementById('checkout-modal').classList.add('show');
-}
-
-function closeCheckoutModal() {
-    document.getElementById('checkout-modal').classList.remove('show');
-    const form = document.getElementById('checkout-form');
-    if (form) {
-        form.reset();
-    }
-}
-
-async function handleCheckoutSubmit(e) {
-    e.preventDefault();
-    await submitOrder();
-}
-
-async function submitOrder() {
-    if (cart.length === 0) {
-        alert('Your cart is empty!');
-        closeCheckoutModal();
-        return;
-    }
-
-    const token = sessionStorage.getItem('token');
-    if (!token) {
-        alert('Session expired. Please login again.');
-        window.location.href = 'login.html';
-        return;
-    }
-
-    const payload = {
-        items: cart.map(item => ({
-            productId: item.product.id,
-            title: item.product.title,
-            price: item.product.price,
-            quantity: item.quantity,
-            category: item.product.category,
-            image: item.product.image
-        })),
-        shipping: {
-            fullName: document.getElementById('checkout-name').value.trim(),
-            phone: document.getElementById('checkout-phone').value.trim(),
-            address: document.getElementById('checkout-address').value.trim(),
-            city: document.getElementById('checkout-city').value.trim(),
-            postalCode: document.getElementById('checkout-postal').value.trim()
-        },
-        paymentMethod: document.getElementById('checkout-payment').value
-    };
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/orders`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || 'Failed to place order');
+    
+    // Add items to purchase history
+    cart.forEach(item => {
+        for (let i = 0; i < item.quantity; i++) {
+            purchaseHistory.push({
+                id: Date.now() + i,
+                productId: item.id,
+                productName: item.product.title,
+                price: item.product.price,
+                image: item.product.image,  // Add this line
+                date: new Date().toISOString()
+            });
         }
-
-        cart = [];
-        sessionStorage.setItem('cart', JSON.stringify(cart));
-        updateCartCount();
-        renderCart();
-
-        document.getElementById('cart-sidebar').classList.remove('open');
-        closeCheckoutModal();
-        alert('Order placed successfully!');
-
-        await Promise.all([fetchOrders(), fetchAnalytics()]);
+    });
+    
+    localStorage.setItem('purchaseHistory', JSON.stringify(purchaseHistory));
+    
+    // Clear cart
+    cart = [];
+    sessionStorage.setItem('cart', JSON.stringify(cart));
+    updateCartCount();
+    renderCart();
+    toggleCartSidebar();
+    
+    alert('Purchase completed successfully!');
+    
+    // Update dashboard if visible
+    if (document.getElementById('dashboard-page').style.display !== 'none') {
         renderDashboard();
-    } catch (error) {
-        console.error('Order error:', error);
-        alert(error.message || 'Unable to place order. Please try again.');
     }
 }
 
@@ -652,10 +596,6 @@ function logout() {
     currentUser = null;
     sessionStorage.removeItem('currentUser');
     sessionStorage.removeItem('token');
-    sessionStorage.removeItem('cart');
-    cart = [];
-    updateCartCount();
-    renderCart();
     
     // Redirect to login page
     window.location.href = 'login.html';
@@ -741,26 +681,17 @@ function navigateToPage(page) {
             return;
         }
         document.getElementById('dashboard-page').style.display = 'block';
-        loadDashboardData();
-    }
-}
-
-// ===== Dashboard =====
-async function loadDashboardData() {
-    try {
-        await Promise.all([fetchOrders(), fetchAnalytics()]);
-    } catch (error) {
-        console.error('Dashboard load error:', error);
-    } finally {
         renderDashboard();
     }
 }
 
+// ===== Dashboard =====
 function renderDashboard() {
     // Security check: Ensure user is logged in before rendering dashboard
     if (!currentUser) {
         const storedUser = JSON.parse(sessionStorage.getItem('currentUser'));
         if (!storedUser) {
+            // User is not logged in, redirect to login
             window.location.href = 'login.html';
             return;
         }
@@ -768,210 +699,35 @@ function renderDashboard() {
     }
     
     renderPurchaseHistory();
-    renderAnalytics();
 }
 
 function renderPurchaseHistory() {
     const historyContainer = document.getElementById('purchase-history');
-    if (!historyContainer) return;
     
-    if (!purchaseHistory || purchaseHistory.length === 0) {
-        historyContainer.innerHTML = '<div class="empty-state"><h3>No orders yet</h3><p>Place your first order to see it here.</p></div>';
+    if (purchaseHistory.length === 0) {
+        historyContainer.innerHTML = '<div class="empty-state"><h3>No purchases yet</h3><p>Start shopping to see your purchase history!</p></div>';
         return;
     }
     
-    const ordersToRender = [...purchaseHistory].sort((a, b) => new Date(b.createdAt || b.date) - new Date(a.createdAt || a.date));
+    // Sort by date (newest first)
+    const sortedHistory = [...purchaseHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
     
-    historyContainer.innerHTML = ordersToRender.map(order => {
-        const orderDate = new Date(order.createdAt || order.date || Date.now()).toLocaleString();
-        const items = order.items || [];
-        const orderTotal = order.totalAmount ?? items.reduce((sum, item) => sum + (item.price || 0) * (item.quantity || 1), 0);
-        const shipping = order.shipping || {};
-        const orderId = order._id ? `#${order._id.slice(-6).toUpperCase()}` : (order.id ? `#${order.id}` : '');
-        const status = (order.status || 'processing');
-        
-        const itemsMarkup = items.map(item => `
-            <div class="order-item">
-                <img src="${item.image || 'https://via.placeholder.com/400'}" alt="${item.title}" onerror="this.src='https://via.placeholder.com/400'">
-                <div class="order-item-details">
-                    <h5>${item.title}</h5>
-                    <p>${item.quantity} × ${formatCurrency(item.price || 0)}</p>
-                </div>
-            </div>
-        `).join('');
+    historyContainer.innerHTML = sortedHistory.map(purchase => {
+        const date = new Date(purchase.date).toLocaleDateString();
+        // Get image from purchase or find from products array as fallback
+        const productImage = purchase.image || products.find(p => p.id === purchase.productId)?.image || 'https://via.placeholder.com/400';
         
         return `
             <div class="purchase-item">
-                <div class="purchase-item-header">
-                    <div>
-                        <h4>Order ${orderId}</h4>
-                        <p>${orderDate}</p>
-                    </div>
-                    <span class="order-status">${status}</span>
+                <img src="${productImage}" alt="${purchase.productName}" class="purchase-item-image" onerror="this.src='https://via.placeholder.com/400'">
+                <div class="purchase-item-info">
+                    <h4>${purchase.productName}</h4>
+                    <p>Price: $${purchase.price.toFixed(2)}</p>
+                    <p>Date: ${date}</p>
                 </div>
-                <p><strong>Total:</strong> ${formatCurrency(orderTotal)}</p>
-                <div class="order-items">
-                    ${itemsMarkup || '<p class="shipping-info">No items found</p>'}
-                </div>
-                <p class="shipping-info"><strong>Ship to:</strong> ${shipping.fullName || 'N/A'}, ${shipping.address || ''} ${shipping.city || ''} ${shipping.postalCode || ''}</p>
             </div>
         `;
     }).join('');
-}
-
-function renderAnalytics() {
-    const statsContainer = document.getElementById('analytics-stats');
-    const categoriesContainer = document.getElementById('analytics-categories');
-    if (!statsContainer || !categoriesContainer) return;
-    
-    if (!analyticsOverview) {
-        statsContainer.innerHTML = '<div class="empty-state"><h3>No analytics yet</h3><p>Orders will appear here as soon as you place them.</p></div>';
-        categoriesContainer.innerHTML = '';
-        drawAnalyticsChart([]);
-        return;
-    }
-    
-    statsContainer.innerHTML = `
-        <div class="stat-card">
-            <p>Total Orders</p>
-            <h4>${analyticsOverview.totalOrders || 0}</h4>
-        </div>
-        <div class="stat-card">
-            <p>Total Revenue</p>
-            <h4>${formatCurrency(analyticsOverview.totalRevenue || 0)}</h4>
-        </div>
-        <div class="stat-card">
-            <p>Average Order Value</p>
-            <h4>${formatCurrency(analyticsOverview.averageOrderValue || 0)}</h4>
-        </div>
-    `;
-    
-    renderCategoryBreakdown(analyticsOverview.categoryBreakdown || []);
-    drawAnalyticsChart(analyticsOverview.monthlySales || []);
-}
-
-function renderCategoryBreakdown(breakdown) {
-    const container = document.getElementById('analytics-categories');
-    if (!container) return;
-    
-    if (!breakdown.length) {
-        container.innerHTML = '<p class="shipping-info">No category data yet.</p>';
-        return;
-    }
-    
-    container.innerHTML = breakdown.map(entry => `
-        <span class="category-chip">${entry.category}: ${entry.quantity}</span>
-    `).join('');
-}
-
-function drawAnalyticsChart(data) {
-    const canvas = document.getElementById('analytics-chart');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const width = canvas.offsetWidth;
-    const height = canvas.offsetHeight;
-    canvas.width = width;
-    canvas.height = height;
-    
-    ctx.clearRect(0, 0, width, height);
-    
-    if (!data.length) {
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary');
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('No analytics data to display yet', width / 2, height / 2);
-        return;
-    }
-    
-    const padding = 40;
-    const chartWidth = width - padding * 2;
-    const chartHeight = height - padding * 2;
-    const maxValue = Math.max(...data.map(point => point.total), 1);
-    
-    // Axes
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-color');
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(padding, height - padding);
-    ctx.lineTo(width - padding, height - padding);
-    ctx.moveTo(padding, padding);
-    ctx.lineTo(padding, height - padding);
-    ctx.stroke();
-    
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    
-    data.forEach((point, index) => {
-        const x = padding + (chartWidth / Math.max(data.length - 1, 1)) * index;
-        const y = height - padding - (point.total / maxValue) * chartHeight;
-        if (index === 0) {
-            ctx.moveTo(x, y);
-        } else {
-            ctx.lineTo(x, y);
-        }
-    });
-    
-    ctx.stroke();
-    
-    data.forEach((point, index) => {
-        const x = padding + (chartWidth / Math.max(data.length - 1, 1)) * index;
-        const y = height - padding - (point.total / maxValue) * chartHeight;
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary');
-        ctx.fillText(point.month, x, height - padding + 15);
-        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary-color');
-    });
-}
-
-async function fetchOrders() {
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/orders/me`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-        const data = await response.json();
-        if (response.ok) {
-            purchaseHistory = data.orders || [];
-        } else {
-            console.error('Orders fetch failed:', data.message);
-        }
-    } catch (error) {
-        console.error('Orders fetch error:', error);
-    }
-}
-
-async function fetchAnalytics() {
-    const token = sessionStorage.getItem('token');
-    if (!token) return;
-    
-    try {
-        const response = await fetch(`${API_BASE_URL}/analytics/overview`, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-        const data = await response.json();
-        if (response.ok) {
-            analyticsOverview = data;
-        } else {
-            console.error('Analytics fetch failed:', data.message);
-        }
-    } catch (error) {
-        console.error('Analytics fetch error:', error);
-    }
-}
-
-function formatCurrency(value = 0) {
-    return `$${Number(value).toFixed(2)}`;
 }
 
 // Spending chart function removed as per requirements

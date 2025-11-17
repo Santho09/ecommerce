@@ -1,5 +1,5 @@
 // ===== Authentication Script for Login Page =====
-const API_BASE_URL = 'https://ecommerce-jknx.onrender.com';
+const API_BASE_URL = 'https://ecommerce-murex-three-67.vercel.app';
 
 // Initialize login page
 document.addEventListener('DOMContentLoaded', () => {
