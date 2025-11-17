@@ -129,50 +129,60 @@ const FALLBACK_DATA = {
   ]
 };
 
-function getUserStorageKey(base) {
-    if (!currentUser || !currentUser.email) return base;
-    return `${base}_${currentUser.email}`;
-}
-
-function migrateLegacyData(base) {
-    if (!currentUser || !currentUser.email) return;
-    const legacyData = JSON.parse(localStorage.getItem(base));
-    if (legacyData && legacyData.length) {
-        const scopedKey = getUserStorageKey(base);
-        const migrated = legacyData.map(entry => ({
-            ...entry,
-            ownerEmail: entry.ownerEmail || currentUser.email
-        }));
-        localStorage.setItem(scopedKey, JSON.stringify(migrated));
-        localStorage.removeItem(base);
+async function fetchOrdersFromServer() {
+    if (!currentUser) {
+        orders = [];
+        purchaseHistory = [];
+        return;
+    }
+    const token = sessionStorage.getItem('token');
+    if (!token) {
+        orders = [];
+        purchaseHistory = [];
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE_URL}/orders`, {
+            headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`
+            }
+        });
+        if (!response.ok) {
+            console.error('Failed to fetch orders from server');
+            orders = [];
+            purchaseHistory = [];
+            return;
+        }
+        const data = await response.json();
+        orders = data.orders || [];
+        rebuildPurchaseHistoryFromOrders();
+    } catch (error) {
+        console.error('Error fetching orders:', error);
+        orders = [];
+        purchaseHistory = [];
     }
 }
 
-function loadUserScopedData() {
-    migrateLegacyData('purchaseHistory');
-    migrateLegacyData('orders');
-
-    const historyKey = getUserStorageKey('purchaseHistory');
-    const rawHistory = JSON.parse(localStorage.getItem(historyKey)) || [];
-    purchaseHistory = currentUser?.email
-        ? rawHistory.filter(entry => entry.ownerEmail === currentUser.email)
-        : [];
-    
-    const ordersKey = getUserStorageKey('orders');
-    const rawOrders = JSON.parse(localStorage.getItem(ordersKey)) || [];
-    orders = currentUser?.email
-        ? rawOrders.filter(order => order.ownerEmail === currentUser.email)
-        : [];
-}
-
-function persistUserScopedData() {
-    if (!currentUser || !currentUser.email) return;
-    localStorage.setItem(getUserStorageKey('purchaseHistory'), JSON.stringify(purchaseHistory));
-    localStorage.setItem(getUserStorageKey('orders'), JSON.stringify(orders));
+function rebuildPurchaseHistoryFromOrders() {
+    purchaseHistory = [];
+    orders.forEach(order => {
+        order.items.forEach(item => {
+            purchaseHistory.push({
+                id: `${order._id || order.id}-${item.id}-${Math.random().toString(36).slice(2, 7)}`,
+                productId: item.id,
+                productName: item.title,
+                price: item.price,
+                image: item.image,
+                paymentMethod: order.paymentMethod,
+                date: order.createdAt
+            });
+        });
+    });
 }
 
 // ===== Initialize App =====
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // Check for a special flag that indicates user just logged in
     // This flag is set only during the login redirect, not on refresh
     const justLoggedIn = sessionStorage.getItem('justLoggedIn');
@@ -192,7 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionUser = sessionStorage.getItem('currentUser');
     if (sessionUser) {
         currentUser = JSON.parse(sessionUser);
-        loadUserScopedData();
+        await fetchOrdersFromServer();
         initializeTheme();
         setupEventListeners();
         checkAuthStatus();
@@ -628,7 +638,7 @@ function closeCheckoutModal() {
     if (checkoutForm) checkoutForm.reset();
 }
 
-function handleCheckoutSubmit(e) {
+async function handleCheckoutSubmit(e) {
     e.preventDefault();
     
     if (!currentUser) {
@@ -683,25 +693,15 @@ function handleCheckoutSubmit(e) {
         ownerEmail: currentUser.email
     };
     
-    orders.push(order);
-    persistUserScopedData();
-    
-    order.items.forEach(item => {
-        for (let i = 0; i < item.quantity; i++) {
-            purchaseHistory.push({
-                id: `${order.id}-${item.id}-${i}`,
-                productId: item.id,
-                productName: item.title,
-                price: item.price,
-                image: item.image,
-                paymentMethod: order.paymentMethod,
-                date: order.createdAt,
-                ownerEmail: currentUser.email
-            });
-        }
-    });
-    persistUserScopedData();
-    
+    try {
+        await createOrderOnServer(order);
+        await fetchOrdersFromServer();
+    } catch (error) {
+        alert(error.message || 'Unable to place order. Please try again.');
+        console.error('Order submission error:', error);
+        return;
+    }
+
     cart = [];
     sessionStorage.setItem('cart', JSON.stringify(cart));
     updateCartCount();
@@ -716,6 +716,30 @@ function handleCheckoutSubmit(e) {
         renderDashboard();
     }
     renderOrdersAnalytics();
+}
+
+async function createOrderOnServer(order) {
+    const token = sessionStorage.getItem('token');
+    if (!token) throw new Error('Missing authentication token.');
+    const payload = {
+        items: order.items,
+        totals: order.totals,
+        shipping: order.shipping,
+        paymentMethod: order.paymentMethod
+    };
+    const response = await fetch(`${API_BASE_URL}/orders`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create order.');
+    }
+    return response.json();
 }
 
 // ===== Authentication =====

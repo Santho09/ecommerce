@@ -68,6 +68,57 @@ const userSchema = new mongoose.Schema(
 
 const User = mongoose.model('User', userSchema);
 
+const orderSchema = new mongoose.Schema(
+    {
+        userId: { type: String, required: true, index: true },
+        userEmail: { type: String, required: true },
+        items: [
+            {
+                id: { type: Number, required: true },
+                title: { type: String, required: true },
+                price: { type: Number, required: true },
+                quantity: { type: Number, required: true },
+                image: { type: String },
+                category: { type: String }
+            }
+        ],
+        totals: {
+            subtotal: { type: Number, required: true },
+            shipping: { type: Number, default: 0 },
+            total: { type: Number, required: true }
+        },
+        shipping: {
+            name: { type: String, required: true },
+            address: { type: String, required: true },
+            city: { type: String, required: true },
+            state: { type: String, required: true },
+            zip: { type: String, required: true },
+            phone: { type: String, required: true }
+        },
+        paymentMethod: { type: String, required: true },
+        status: { type: String, default: 'Processing' },
+        createdAt: { type: Date, default: Date.now }
+    },
+    { collection: 'orders' }
+);
+
+const Order = mongoose.model('Order', orderSchema);
+
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ message: 'Authentication token missing' });
+    }
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ message: 'Invalid or expired token' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
 // Register endpoint
 app.post('/auth/register', async (req, res) => {
     try {
@@ -174,6 +225,59 @@ app.post('/auth/login', async (req, res) => {
         res.status(500).json({ 
             message: 'Internal server error' 
         });
+    }
+});
+
+// Orders endpoints
+app.get('/orders', authenticateToken, async (req, res) => {
+    try {
+        const orders = await Order.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+        res.json({ orders });
+    } catch (error) {
+        console.error('Fetch orders error:', error);
+        res.status(500).json({
+            message: 'Unable to fetch orders'
+        });
+    }
+});
+
+app.post('/orders', authenticateToken, async (req, res) => {
+    try {
+        const { items, totals, shipping, paymentMethod } = req.body;
+
+        if (!Array.isArray(items) || !items.length) {
+            return res.status(400).json({ message: 'Order items are required' });
+        }
+
+        if (!totals || typeof totals.total !== 'number') {
+            return res.status(400).json({ message: 'Order totals are required' });
+        }
+
+        if (!shipping || !shipping.name || !shipping.address) {
+            return res.status(400).json({ message: 'Shipping details are required' });
+        }
+
+        if (!paymentMethod) {
+            return res.status(400).json({ message: 'Payment method is required' });
+        }
+
+        const newOrder = await Order.create({
+            userId: req.user.userId,
+            userEmail: req.user.email,
+            items,
+            totals,
+            shipping,
+            paymentMethod,
+            status: 'Processing'
+        });
+
+        res.status(201).json({
+            message: 'Order placed successfully',
+            order: newOrder
+        });
+    } catch (error) {
+        console.error('Create order error:', error);
+        res.status(500).json({ message: 'Unable to place order' });
     }
 });
 

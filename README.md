@@ -28,10 +28,10 @@ An innovative, responsive, and interactive e-commerce frontend built with vanill
 - **User Profile**: Display user information
 
 ### Backend Features
-- **RESTful API**: Express.js backend with authentication endpoints
+- **RESTful API**: Express.js backend with authentication and order endpoints
 - **Password Hashing**: Secure password storage using bcrypt
 - **JWT Tokens**: JSON Web Token generation for secure authentication
-- **MongoDB Storage**: Mongoose models backed by MongoDB (Atlas/local) for persistent users
+- **MongoDB Storage**: Mongoose models backed by MongoDB (Atlas/local) for persistent users and orders
 
 ## 📁 Project Structure
 
