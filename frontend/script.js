@@ -1,7 +1,7 @@
 // ===== Global Variables =====
 let products = [];
 let filteredProducts = [];
-let favorites = JSON.parse(localStorage.getItem('favorites')) || [];
+let favorites = [];
 let cart = JSON.parse(sessionStorage.getItem('cart')) || []; // Cart array: [{id, quantity, product}]
 let currentUser = JSON.parse(sessionStorage.getItem('currentUser')) || null;
 let purchaseHistory = [];
@@ -129,6 +129,23 @@ const FALLBACK_DATA = {
   ]
 };
 
+function getFavoritesStorageKey() {
+    if (currentUser?.email) {
+        return `favorites_${currentUser.email}`;
+    }
+    return 'favorites_guest';
+}
+
+function loadFavoritesForCurrentUser() {
+    favorites = JSON.parse(localStorage.getItem(getFavoritesStorageKey())) || [];
+    updateFavoritesCount();
+    renderFavorites();
+}
+
+function saveFavoritesForCurrentUser() {
+    localStorage.setItem(getFavoritesStorageKey(), JSON.stringify(favorites));
+}
+
 async function fetchOrdersFromServer() {
     if (!currentUser) {
         orders = [];
@@ -203,11 +220,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (sessionUser) {
         currentUser = JSON.parse(sessionUser);
         await fetchOrdersFromServer();
+        loadFavoritesForCurrentUser();
         initializeTheme();
         setupEventListeners();
         checkAuthStatus();
         loadProducts();
-        updateFavoritesCount();
         updateCartCount();
         renderCart();
         ensureDashboardProtection();
@@ -424,7 +441,7 @@ function toggleFavorite(productId) {
     } else {
         favorites.push(productId);
     }
-    localStorage.setItem('favorites', JSON.stringify(favorites));
+    saveFavoritesForCurrentUser();
     updateFavoritesCount();
     renderProducts();
     renderFavorites();
