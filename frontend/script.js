@@ -136,10 +136,16 @@ function getUserStorageKey(base) {
 
 function loadUserScopedData() {
     const historyKey = getUserStorageKey('purchaseHistory');
-    purchaseHistory = JSON.parse(localStorage.getItem(historyKey)) || [];
+    const rawHistory = JSON.parse(localStorage.getItem(historyKey)) || [];
+    purchaseHistory = currentUser?.email
+        ? rawHistory.filter(entry => !entry.ownerEmail || entry.ownerEmail === currentUser.email)
+        : rawHistory;
     
     const ordersKey = getUserStorageKey('orders');
-    orders = JSON.parse(localStorage.getItem(ordersKey)) || [];
+    const rawOrders = JSON.parse(localStorage.getItem(ordersKey)) || [];
+    orders = currentUser?.email
+        ? rawOrders.filter(order => !order.ownerEmail || order.ownerEmail === currentUser.email)
+        : rawOrders;
 }
 
 function persistUserScopedData() {
@@ -656,7 +662,8 @@ function handleCheckoutSubmit(e) {
         shipping: shippingData,
         paymentMethod,
         status: 'Processing',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        ownerEmail: currentUser.email
     };
     
     orders.push(order);
@@ -671,7 +678,8 @@ function handleCheckoutSubmit(e) {
                 price: item.price,
                 image: item.image,
                 paymentMethod: order.paymentMethod,
-                date: order.createdAt
+                date: order.createdAt,
+                ownerEmail: currentUser.email
             });
         }
     });
