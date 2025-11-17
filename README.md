@@ -10,27 +10,30 @@ An innovative, responsive, and interactive e-commerce frontend built with vanill
 - **Sorting**: Sort products by price (low to high, high to low) and rating
 - **Favorites**: Add/remove products to favorites (stored in localStorage)
 - **Product Details**: Modal popup showing detailed product information
+- **Cart & Checkout**: Persistent cart with quantity controls and a full checkout form (shipping + payment)
 - **Dark Mode**: Toggle between light and dark themes
 - **Responsive Design**: Fully responsive layout using Flexbox and CSS Grid
 - **Smooth Animations**: Hover effects and transitions throughout
 - **Floating Action Button**: Quick access to favorites sidebar
+- **Real-Time Analytics**: Dashboard visualizations for revenue, orders, and category performance
 
 ### Authentication Features
 - **User Registration**: Create new accounts with email and password
 - **User Login**: Secure login with JWT token authentication
 - **Protected Routes**: Dashboard accessible only to authenticated users
-- **Token Storage**: JWT tokens stored in localStorage
+- **Token Storage**: JWT tokens stored securely in `sessionStorage`
 
 ### Dashboard Features
-- **Purchase History**: View all past purchases
-- **Data Visualization**: Canvas-based chart showing monthly spending trends
+- **Order Management**: View every order with shipping details, status, and line items
+- **Real-Time Analytics**: Revenue, total orders, AOV, category breakdowns, and trend charts
 - **User Profile**: Display user information
 
 ### Backend Features
-- **RESTful API**: Express.js backend with authentication endpoints
+- **RESTful API**: Express.js backend with authentication, orders, and analytics endpoints
+- **MongoDB Storage**: Mongoose models for users and orders (no more JSON flat files)
 - **Password Hashing**: Secure password storage using bcrypt
 - **JWT Tokens**: JSON Web Token generation for secure authentication
-- **User Storage**: JSON-based user database (easily upgradeable to a real database)
+- **Analytics Aggregation**: On-demand calculations for revenue, orders, and category performance
 
 ## 📁 Project Structure
 
@@ -42,9 +45,10 @@ ecommerce/
 │   ├── script.js           # Frontend JavaScript logic
 │   └── data.json          # Mock product data
 ├── backend/
-│   ├── index.js           # Express server and API endpoints
+│   ├── index.js           # Express server, auth, orders, analytics
 │   ├── package.json       # Backend dependencies
-│   └── users.json         # User database (auto-generated)
+│   ├── ENV_SETUP.md       # Backend environment variable guide
+│   └── package-lock.json
 └── README.md              # This file
 ```
 
@@ -101,12 +105,11 @@ If you're using VS Code, you can install the "Live Server" extension and right-c
 6. **Add to Favorites**: Click the heart icon to add products to favorites
 7. **View Favorites**: Click the floating action button (FAB) to see your favorites
 8. **Login/Signup**: Click the "Login" button to create an account or sign in
-9. **Dashboard**: After logging in, access your dashboard to view purchase history and spending trends
-10. **Dark Mode**: Toggle the theme using the moon/sun icon in the navigation bar
+9. **Checkout**: Add items to your cart and go through the checkout form to place real orders
+10. **Dashboard**: After logging in, access your dashboard to view detailed orders and analytics
+11. **Dark Mode**: Toggle the theme using the moon/sun icon in the navigation bar
 
 ### For Developers
-
-#### Backend API Endpoints
 
 - `POST /auth/register` - Register a new user
   ```json
@@ -125,6 +128,32 @@ If you're using VS Code, you can install the "Live Server" extension and right-c
   }
   ```
 
+- `POST /orders` - Create an order (requires `Authorization: Bearer <token>`)
+  ```json
+  {
+    "items": [
+      {
+        "productId": 1,
+        "title": "Wireless Headphones",
+        "price": 79.99,
+        "quantity": 2,
+        "category": "Electronics",
+        "image": "https://..."
+      }
+    ],
+    "shipping": {
+      "fullName": "John Doe",
+      "phone": "+1 555-1234",
+      "address": "123 Main Street",
+      "city": "New York",
+      "postalCode": "10001"
+    },
+    "paymentMethod": "card"
+  }
+  ```
+
+- `GET /orders/me` - Fetch the authenticated user's orders
+- `GET /analytics/overview` - Fetch revenue, order, and category analytics for the logged-in user
 - `GET /health` - Health check endpoint
 
 #### Frontend Configuration
