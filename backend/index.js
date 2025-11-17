@@ -7,9 +7,9 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production'; // In production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || '6747933461adbf52fe7187b45a781e14543d2269192d79e55251604d172f2da8'; // In production, use environment variable
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://ecommerce-murex-three-67.vercel.app';
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/ecommerce_auth';
+const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://2022cs0152_db_user:santhosh123@cluster0.dnzpkji.mongodb.net/?appName=Cluster0';
 
 // Middleware
 app.use(cors({
